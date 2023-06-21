@@ -9,3 +9,15 @@ Aside: Here it is in one line of bash
 curl https://epic.gsfc.nasa.gov/api/natural | jq -r .[].image | sed -E 's/epic_1b
 _(.{4})(.{2})(.{2}).+/https:\/\/epic.gsfc.nasa.gov\/archive\/natural\/\1\/\2\/\3\/png\/\0.png/' | xargs feh -x --slideshow-delay 1
 ```
+
+## Usage
+
+Built with Meson.
+
+```bash
+$ git clone https://github.com/hughrawlinson/epic-c.git
+$ cd epic-c
+$ meson setup build
+$ ninja -C build
+$ ./build/epic-c
+```
