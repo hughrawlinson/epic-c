@@ -15,10 +15,19 @@ int draw() {
     return 3;
   }
 
-  if (SDL_CreateWindowAndRenderer(480, 480, SDL_WINDOW_RESIZABLE, &window,
-                                  &renderer)) {
-    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                 "Couldn't create window and renderer: %s", SDL_GetError());
+  if (!(window = SDL_CreateWindow("Hi!", SDL_WINDOWPOS_UNDEFINED,
+                                  SDL_WINDOWPOS_UNDEFINED, 480, 480,
+                                  SDL_WINDOW_RESIZABLE))) {
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window: %s",
+                 SDL_GetError());
+    return 3;
+  }
+
+  if (!(renderer = SDL_CreateRenderer(window, -1,
+                                      SDL_RENDERER_PRESENTVSYNC |
+                                          SDL_RENDERER_ACCELERATED))) {
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create renderer: %s",
+                 SDL_GetError());
     return 3;
   }
 
@@ -28,8 +37,21 @@ int draw() {
       break;
     }
 
-    SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0x00);
+    SDL_Rect rect;
+
+    rect.x = 400;
+    rect.y = 400;
+    rect.w = 200;
+    rect.h = 250;
+
     SDL_RenderClear(renderer);
+    SDL_SetRenderDrawColor(renderer, 0x00, 0x90, 0x00, 0x00);
+    SDL_RenderFillRect(renderer, &rect);
+    int result = SDL_RenderDrawRect(renderer, &rect);
+    if (result) {
+      fprintf(stderr, "%s", SDL_GetError());
+    }
+    SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0x00);
     SDL_RenderPresent(renderer);
   }
 

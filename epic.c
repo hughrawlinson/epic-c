@@ -1,5 +1,5 @@
 #define CURL_STATICLIB
-// #define DRAW_GUI
+#define DRAW_GUI
 #include "curl/curl.h"
 #include "gui.c"
 #include <json-c/json_tokener.h>
