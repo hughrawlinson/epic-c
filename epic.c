@@ -1,6 +1,6 @@
 #define CURL_STATICLIB
 #define _GNU_SOURCE
-// #define DRAW_GUI
+#define DRAW_GUI
 #include "curl/curl.h"
 #include "gui.c"
 #include <dirent.h>
@@ -253,7 +253,7 @@ int main(void) {
     printf("%s\n", filepaths[i]);
   }
 
-  draw_result = draw();
+  draw_result = draw(filepaths, filecount);
 
   curl_global_cleanup();
   return draw_result;
