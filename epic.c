@@ -3,6 +3,7 @@
 // #define DRAW_GUI
 #include "curl/curl.h"
 #include "gui.c"
+#include <dirent.h>
 #include <json-c/json_tokener.h>
 #include <json-c/json_util.h>
 #include <stdio.h>
@@ -81,7 +82,8 @@ struct response get_epic_image_manifest() {
 
 static const char *datafolder = "/home/hugh/epic-images/";
 
-void start_epic_image_download(IMAGE_META *image_metas, size_t count) {
+void start_epic_image_download(IMAGE_META *image_metas, size_t count,
+                               char ***filepaths) {
   CURL *handles[count];
   CURLM *multi_handle = curl_multi_init();
   CURLMsg *msg;  /* for picking up messages with the transfer status */
@@ -97,8 +99,8 @@ void start_epic_image_download(IMAGE_META *image_metas, size_t count) {
     strcpy(output_filepath, datafolder);
     strcat(output_filepath, image_metas[i].id);
     strcat(output_filepath, ".png\0");
+    asprintf(&(*filepaths)[i], "%s", output_filepath);
     of = fopen(output_filepath, "wb");
-    printf("%s\n", image_metas[i].url);
     curl_easy_setopt(handles[i], CURLOPT_URL, image_metas[i].url);
     curl_easy_setopt(handles[i], CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(handles[i], CURLOPT_WRITEDATA, of);
@@ -108,12 +110,10 @@ void start_epic_image_download(IMAGE_META *image_metas, size_t count) {
   }
 
   while (still_running) {
-    printf("%d\n", still_running);
     CURLMcode mc = curl_multi_perform(multi_handle, &still_running);
-    printf("%d\n", still_running);
 
     if (still_running) {
-      printf("Still running: %d", still_running);
+      printf("Still running: %d\n", still_running);
       mc = curl_multi_poll(multi_handle, NULL, 0, 1000, NULL);
     }
 
@@ -121,7 +121,7 @@ void start_epic_image_download(IMAGE_META *image_metas, size_t count) {
       fprintf(stderr, "CURL Multi Poll response: %s", curl_multi_strerror(mc));
       break;
     }
-    sleep(1);
+    usleep(100000);
   }
 
   while ((msg = curl_multi_info_read(multi_handle, &msgs_left))) {
@@ -183,24 +183,75 @@ void get_image_metas_from_manifest(IMAGE_META *image_metas, size_t image_count,
   }
 }
 
-int main(void) {
+int file_select(const struct dirent *entry) {
+  char test_string[9];
+  char test_string_postfix[5];
+
+  strncpy(test_string, entry->d_name, 8);
+  test_string[8] = NULL;
+  strncpy(test_string_postfix, entry->d_name + 22, 5);
+
+  return !strcmp(test_string, "epic_1b_") &
+         !strcmp(test_string_postfix, ".png");
+}
+
+size_t get_list_of_downloaded_image_paths(char ***filepaths) {
+  struct dirent **namelist;
+  size_t length;
+  length = scandir(datafolder, &namelist, &file_select, alphasort);
+  if (length == -1) {
+    perror("scandir");
+    exit(EXIT_FAILURE);
+  }
+
+  *filepaths = malloc(length * sizeof(char *));
+
+  for (size_t i = 0; i < length; i++) {
+    asprintf(&(*filepaths)[i], "%s%s", datafolder, namelist[i]->d_name);
+    free(namelist[i]);
+  }
+
+  free(namelist);
+  return length;
+}
+
+size_t download_images(char ***filepaths) {
   struct response r;
   json_object *body;
   size_t image_count;
   IMAGE_META *image_metas;
-  int draw_result;
-
-  curl_global_init(CURL_GLOBAL_ALL);
 
   r = get_epic_image_manifest();
   body = parse_response_body(&r);
   image_count = json_object_array_length(body);
   image_metas = malloc(sizeof(IMAGE_META) * image_count);
+  *filepaths = malloc(image_count * sizeof(char *));
   get_image_metas_from_manifest(image_metas, image_count, body);
-  start_epic_image_download(image_metas, image_count);
+  start_epic_image_download(image_metas, image_count, filepaths);
 
   free(body);
   free(r.ptr);
+  free(image_metas);
+
+  return image_count;
+}
+
+int main(void) {
+  char **filepaths;
+  size_t filecount;
+  int draw_result;
+
+  curl_global_init(CURL_GLOBAL_ALL);
+
+  if (secure_getenv("SKIP_DOWNLOAD")) {
+    filecount = get_list_of_downloaded_image_paths(&filepaths);
+  } else {
+    filecount = download_images(&filepaths);
+  }
+
+  for (size_t i = 0; i < filecount; i++) {
+    printf("%s\n", filepaths[i]);
+  }
 
   draw_result = draw();
 
